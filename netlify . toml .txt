@@ -1,0 +1,16 @@
+Configuración global de Netlify
+[build]
+Directorio donde tu herramienta de build (e.g., Vite, CRA) coloca los archivos de producción.
+Por defecto para muchos frameworks, usa 'dist' o 'build'.
+Asumiremos 'build' como un estándar. Cambia esto si usas otro.
+publish = "build"
+Comando de build que se ejecuta en Netlify.
+El comando dependerá de tu configuración de proyecto (e.g., npm run build, yarn build).
+command = "npm run build"
+Configuración para Single Page Applications (SPA)
+Esto es crucial para React Router (o manejo interno de rutas)
+Asegura que todas las rutas se redirijan a index.html
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

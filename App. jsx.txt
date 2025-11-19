@@ -1,0 +1,347 @@
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+
+// --- FONT SIMULATION (For CodePen compatibility) ---
+// Uing san inline style tag to load an elegant cursive font (e.g., Allura)
+// and define a custom class 'font-dorchester' for the title.
+const CustomStyles = () => (
+<style>
+{`
+@import url('https://fonts.googleapis.com/css2?family=Allura:wght@400&family=Inter:wght@100..900&display=swap');
+body {
+    font-family: 'Inter', sans-serif;
+}
+.font-dorchester {
+    font-family: 'Allura', cursive;
+    font-weight: 400;
+    font-size: 3rem; /* Título más grande */
+}
+@media (min-width: 768px) {
+    .font-dorchester {
+        font-size: 5rem;
+    }
+}
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #E0B0B0; /* Rosa palo */
+    border-radius: 3px;
+}
+.shadow-text {
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+.loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #F472B6; /* Pink-400 */
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+`}
+</style>
+);
+
+// --- MOCK DATA FOR OCCASION LIST ---
+const OCCASIONS = [
+    'Casual', 'Formal', 'Deportivo', 'Clásico', 'Romántico', 'Vintage',
+    'Rockero', 'Preppy', 'Minimalista', 'Para la playa', 'Elegante',
+    'Dramático', 'Sexy', 'Oversize', 'Punk', 'Urbano', 'Oriental',
+    'K-Pop', 'Semi Formal'
+];
+
+// --- GEMINI API INTEGRATION ---
+const apiKey = ""; // API key is provided by the environment
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+// JSON schema for structured output
+const OUTFIT_SCHEMA = {
+    type: "ARRAY",
+    description: "A list of 3 unique outfit ideas.",
+    items: {
+        type: "OBJECT",
+        properties: {
+            "name": { "type": "STRING", "description": "A creative, fashionable name for the outfit (e.g., 'Bohemian Rhapsody', 'Executive Power Look')." },
+            // Nuevo campo para la descripción
+            "description": { "type": "STRING", "description": "A detailed, stylish description of the overall look, including colors, mood, and how the pieces interact (max 2 sentences)." },
+            "items": {
+                "type": "ARRAY",
+                "description": "A list of 3 to 5 core clothing items and accessories for the outfit.",
+                "items": { "type": "STRING" }
+            },
+            "link": { "type": "STRING", "description": "A mock shopping link (e.g., 'https://fashion-shop.com/buy-now')." }
+        },
+        required: ["name", "description", "items", "link"] // 'description' ahora es obligatorio
+    }
+};
+
+const fetchOutfits = async (occasion) => {
+    // Instrucción para el modelo: genera en español y pide la descripción
+    const systemPrompt = "Eres 'Fashions girl', una estilista de moda IA de clase mundial. Tu tarea es generar 3 ideas de outfit únicas, específicas y de alta costura para la ocasión solicitada. Para cada outfit, proporciona un nombre creativo, una lista de 3 a 5 artículos, y una descripción elegante y detallada del look general (máximo 2 oraciones). Asegúrate de que todas las respuestas sean en español y que los nombres y descripciones de los artículos sean atractivos y con estilo.";
+    const userQuery = `Genera 3 recomendaciones de outfits distintos para la ocasión: "${occasion}".`;
+
+    const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: OUTFIT_SCHEMA,
+        }
+    };
+
+    let result = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+    let delay = 1000;
+
+    while (attempts < maxAttempts) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            result = await response.json();
+            
+            const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (jsonText) {
+                // The model returns a stringified JSON array
+                const outfits = JSON.parse(jsonText);
+                return outfits;
+            } else {
+                throw new Error("API response structure invalid or empty text content.");
+            }
+
+        } catch (error) {
+            console.error(`Attempt ${attempts + 1} failed:`, error.message);
+            attempts++;
+            if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+            } else {
+                // Fallback data updated to include descriptions in Spanish
+                console.error("All API attempts failed. Returning fallback data.");
+                return [
+                    { name: 'Elegancia de Reserva', description: 'Una combinación sencilla pero sofisticada que asegura el mejor estilo en cualquier momento.', items: [`Artículo elegante 1 para ${occasion}`, `Artículo elegante 2 para ${occasion}`], link: 'https://fallback.com/link' },
+                    { name: 'Clásico Alternativo', description: 'Un look infalible con un toque moderno y cómodo, perfecto para esta ocasión especial.', items: [`Pieza clásica 1 para ${occasion}`, `Pieza clásica 2 para ${occasion}`], link: 'https://fallback.com/link' },
+                ];
+            }
+        }
+    }
+};
+
+// --- COMPONENT 1: HOME SCREEN ---
+const HomeScreen = ({ onSearch, selectedOccasion, setSelectedOccasion }) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    // Clase común para el fondo y texto, según la estética elegante
+    const eleganceClasses = "bg-stone-50 text-stone-700 min-h-screen p-6 md:p-12 transition-all duration-500";
+
+    // Clases del botón ovalado (rosa palo)
+    const buttonClasses = "w-full max-w-sm mx-auto h-14 bg-pink-300 hover:bg-pink-400 text-white font-extrabold text-xl tracking-wider rounded-full shadow-lg transition duration-300 transform hover:scale-[1.02] active:scale-95";
+
+    return (
+        <div className={`${eleganceClasses} flex flex-col items-center justify-start pt-16`}>
+            {/* Título: Fashion Girl (Cursiva, Dorado) */}
+            <h1 className="font-dorchester text-yellow-600 mb-12 shadow-text">
+                Fashions girl
+            </h1>
+
+            {/* Selector de Ocasiones */}
+            <div className="w-full max-w-md mx-auto mb-10">
+                <label className="text-lg font-serif mb-2 block text-center text-stone-600">
+                    OCASIONES
+                </label>
+
+                {/* Dropdown Container */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowDropdown(!showDropdown)}
+                        className="w-full py-3 px-4 text-left bg-white border border-stone-300 rounded-lg shadow-md flex justify-between items-center transition duration-200 hover:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    >
+                        <span className={selectedOccasion ? "text-stone-800" : "text-stone-400"}>
+                            {selectedOccasion || "Selecciona una ocasión"}
+                        </span>
+                        <svg className={`w-4 h-4 transition-transform duration-300 ${showDropdown ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+
+                    {/* Dropdown List */}
+                    {showDropdown && (
+                        <div className="absolute z-10 w-full mt-2 bg-white border border-stone-300 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+                            {OCCASIONS.map((occasion) => (
+                                <div
+                                    key={occasion}
+                                    className="py-2 px-4 cursor-pointer hover:bg-pink-100 transition duration-150 text-stone-700"
+                                    onClick={() => {
+                                        setSelectedOccasion(occasion);
+                                        setShowDropdown(false);
+                                    }}
+                                >
+                                    {occasion}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Botón de Búsqueda (Rosa Palo) */}
+            <button
+                onClick={onSearch}
+                disabled={!selectedOccasion}
+                className={`${buttonClasses} ${!selectedOccasion ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                BUSCAR OUTFIT
+            </button>
+
+            <p className="mt-8 text-sm text-stone-500 text-center max-w-sm">
+                Elige una ocasión para ver los looks de moda generados por la inteligencia de Fashions girl.
+            </p>
+        </div>
+    );
+};
+
+// --- COMPONENT 2: RESULTS SCREEN ---
+const ResultsScreen = ({ occasion, outfits, loading, error, onBack }) => {
+    const eleganceClasses = "bg-stone-50 text-stone-700 min-h-screen p-6 md:p-12 transition-all duration-500";
+
+    return (
+        <div className={`${eleganceClasses} flex flex-col items-center pt-16`}>
+            {/* Título de la Ocasión */}
+            <h1 className="text-xl md:text-3xl font-serif text-stone-800 mb-2 text-center">
+                Looks generados para: <span className="text-pink-400 font-bold">{occasion}</span>
+            </h1>
+            <p className="text-sm text-stone-500 mb-10 text-center">
+                Descubre las opciones más chic generadas por la inteligencia artificial.
+            </p>
+
+            {/* Loading/Error/Content */}
+            {loading && (
+                <div className="flex flex-col items-center justify-center h-64">
+                    <div className="loading-spinner"></div>
+                    <p className="mt-4 text-pink-400 font-semibold">Generando looks únicos...</p>
+                    <p className="text-sm text-stone-500">Esto puede tomar unos segundos.</p>
+                </div>
+            )}
+
+            {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md text-center" role="alert">
+                    <strong className="font-bold">Error de Generación:</strong>
+                    <span className="block sm:inline"> {error} Usando opciones alternativas.</span>
+                </div>
+            )}
+
+            {!loading && outfits.length > 0 && (
+                <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {outfits.map((outfit, index) => (
+                        <div key={index} className="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-yellow-600 flex flex-col transition-transform duration-300 hover:scale-[1.02] hover:shadow-xl">
+                            <div className="flex justify-between items-start mb-4">
+                                <h2 className="text-2xl font-bold text-stone-800 font-serif">{outfit.name}</h2>
+                                {/* Icono decorativo de Gold */}
+                                <svg className="w-6 h-6 text-yellow-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707l-.707-.707V8a6 6 0 00-6-6zM12 18h-4a2 2 0 104 0z"/></svg>
+                            </div>
+
+                            {/* Campo de descripción nuevo */}
+                            <p className="text-sm italic text-stone-700 mb-4">{outfit.description}</p>
+                            
+                            <p className="text-pink-400 font-semibold mb-3">Componentes del Outfit:</p>
+                            <ul className="list-disc list-inside text-stone-600 mb-6 flex-grow">
+                                {outfit.items.map((item, i) => (
+                                    <li key={i} className="text-sm">{item}</li>
+                                ))}
+                            </ul>
+
+                            <a
+                                href={outfit.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 py-2 px-4 text-center bg-pink-300 text-white font-bold rounded-full hover:bg-pink-400 transition duration-200 shadow-md text-sm"
+                            >
+                                Comprar este Look (Mock Link)
+                            </a>
+
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Botón de Regreso */}
+            <button
+                onClick={onBack}
+                className="mt-12 py-3 px-8 text-center bg-stone-700 text-white font-semibold rounded-full hover:bg-stone-600 transition duration-300 shadow-xl"
+            >
+                ← Volver a Elegir Ocasión
+            </button>
+        </div>
+    );
+};
+
+// --- MAIN APP COMPONENT ---
+export default function App() {
+    // State: 'home' for Screen 1, 'results' for Screen 2
+    const [screen, setScreen] = useState('home');
+    const [selectedOccasion, setSelectedOccasion] = useState(null);
+    const [outfits, setOutfits] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const handleSearch = useCallback(async () => {
+        if (!selectedOccasion) return;
+
+        setScreen('results');
+        setLoading(true);
+        setError(null);
+        setOutfits([]);
+
+        try {
+            const generatedOutfits = await fetchOutfits(selectedOccasion);
+            setOutfits(generatedOutfits);
+        } catch (err) {
+            console.error("Failed to generate outfits:", err);
+            setError("No pudimos generar outfits. Por favor, inténtalo de nuevo.");
+            setOutfits([]); // Clear in case of error
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedOccasion]);
+
+    const handleBack = () => {
+        setScreen('home');
+        setOutfits([]);
+    };
+
+    return (
+        <>
+            <CustomStyles />
+            <div className="min-h-screen antialiased bg-stone-50">
+                {screen === 'home' && (
+                    <HomeScreen
+                        onSearch={handleSearch}
+                        selectedOccasion={selectedOccasion}
+                        setSelectedOccasion={setSelectedOccasion}
+                    />
+                )}
+                {screen === 'results' && (
+                    <ResultsScreen
+                        occasion={selectedOccasion}
+                        outfits={outfits}
+                        loading={loading}
+                        error={error}
+                        onBack={handleBack}
+                    />
+                )}
+            </div>
+        </>
+    );
+}
