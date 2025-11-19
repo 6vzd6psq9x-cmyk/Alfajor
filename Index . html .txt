@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arma tu Alfajor - CNSC 2025</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Asignatura: Tecnología, Profesor/a: Victoria Silva, Curso: IIdo Medio, CNSC 2025 */
+
+        body {
+            background-color: #f5c0d1; /* Rosado pastel */
+            font-family: 'Lucida Calligraphy', cursive;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #root {
+            width: 100%;
+            max-width: 650px;
+            background-color: #ffffff;
+            border-radius: 25px;
+            padding: 30px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+            margin: 20px 0;
+        }
+
+        h1 {
+            color: #c4a4b4;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+        }
+        
+        h3 {
+            color: #a78a97;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #f7e2e8;
+            padding-bottom: 5px;
+        }
+
+        .button {
+            background-color: #c4a4b4;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 25px 0 10px 0;
+            display: inline-block;
+            transition: background-color 0.3s, transform 0.1s;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .button:hover {
+            background-color: #a78a97;
+            transform: translateY(-2px);
+        }
+
+        .alfajor {
+            width: 100%;
+            max-width: 350px;
+            height: auto;
+            margin: 0 auto;
+            display: block;
+            border-radius: 15px;
+            border: 3px solid #f1a7b7;
+            transition: transform 0.5s ease-in-out;
+        }
+        
+        .alfajor-display {
+            min-height: 180px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Botones de Opciones */
+        .options-group button {
+            font-size: 14px;
+            padding: 10px 15px;
+            margin: 5px;
+            background-color: #f1a7b7;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            color: white;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+        }
+
+        .options-group button:hover {
+            background-color: #ea91a3;
+        }
+
+        /* Resaltar selección */
+        .button-active {
+            background-color: #8c737f !important;
+            box-shadow: 0 0 0 3px #f1a7b7;
+            font-weight: bold;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        /* Estilos para el resumen y el formulario */
+        .summary-box {
+            background-color: #fff9fa;
+            border: 1px solid #f7e2e8;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-box p {
+            margin: 5px 0;
+            text-align: left;
+            font-size: 1.1em;
+        }
+
+        form label {
+            display: block;
+            margin-bottom: 15px;
+            text-align: left;
+            font-weight: bold;
+            color: #666;
+        }
+
+        form input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // --- Definición de Opciones y Precios ---
+        const INGREDIENTES = [
+            { name: "Trufa y manjar", price: 2, img: "https://via.placeholder.com/350x180/e79f9f?text=Trufa+y+Manjar" },
+            { name: "Oreo y manjar", price: 2, img: "https://via.placeholder.com/350x180/c4a4b4?text=Oreo+y+Manjar" },
+            { name: "Bon o Bon y manjar", price: 3, img: "https://via.placeholder.com/350x180/f1a7b7?text=Bon+o+Bon" },
+            { name: "Prestigio y manjar", price: 2, img: "https://via.placeholder.com/350x180/a78a97?text=Prestigio" },
+            { name: "Frambuesa y manjar", price: 3, img: "https://via.placeholder.com/350x180/f5c0d1?text=Frambuesa" },
+            { name: "Solo manjar", price: 1, img: "https://via.placeholder.com/350x180/ffffff?text=Solo+Manjar" },
+        ];
+
+        const CHOCOLATES = [
+            { name: "Chocolate Semi Amargo", price: 1, img: "Amargo" },
+            { name: "Chocolate Blanco", price: 1, img: "Blanco" },
+        ];
+
+        const DECORACIONES = [
+            { name: "Galleta de Oreo Molida", price: 1, img: "Oreo" },
+            { name: "Chocolate Blanco", price: 0.5, img: "ChocBlanco" },
+            { name: "Pedacitos de Chocolate Negro", price: 0.5, img: "ChocNegro" },
+            { name: "Ninguna", price: 0, img: "Ninguna" },
+        ];
+
+        const PRECIO_BASE = 10;
+
+        function App() {
+            const [ingrediente, setIngrediente] = useState(null);
+            const [chocolate, setChocolate] = useState(null);
+            const [decoracion, setDecoracion] = useState(null);
+            const [pedidoListo, setPedidoListo] = useState(false);
+            
+            const [datosEnvio, setDatosEnvio] = useState({
+                nombre: "",
+                direccion: "",
+                tarjeta: "",
+            });
+
+            // --- Lógica de cálculo de precio mejorada con useMemo ---
+            const calcularPrecio = useMemo(() => {
+                let precio = PRECIO_BASE;
+                if (ingrediente) precio += ingrediente.price;
+                if (chocolate) precio += chocolate.price;
+                if (decoracion) precio += decoracion.price;
+                return precio.toFixed(2); // Formato con dos decimales
+            }, [ingrediente, chocolate, decoracion]);
+            
+            // --- Lógica de la imagen dinámica (simulada) ---
+            const getAlfajorImage = useMemo(() => {
+                if (ingrediente) {
+                    return ingrediente.img;
+                }
+                return "https://via.placeholder.com/350x180/f7e2e8?text=Arma+tu+Alfajor";
+            }, [ingrediente]);
+
+            // --- Handlers ---
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                
+                // Validación para el campo de tarjeta (solo números)
+                if (name === 'tarjeta' && !/^\d*$/.test(value)) {
+                    return; 
+                }
+
+                setDatosEnvio(prevState => ({
+                    ...prevState,
+                    [name]: value
+                }));
+            };
+
+            const handleEnvio = (e) => {
+                e.preventDefault();
+                
+                // Validación de longitud básica para la tarjeta
+                if (datosEnvio.tarjeta.length < 10) {
+                     alert("Por favor, ingresa un número de tarjeta válido (mínimo 10 dígitos).");
+                     return;
+                }
+                
+                console.log("--- Pedido Confirmado ---");
+                console.log("Alfajor:", { ingrediente, chocolate, decoracion });
+                console.log("Precio:", calcularPrecio);
+                console.log("Datos de Envío/Pago:", datosEnvio);
+                
+                alert(`¡Gracias ${datosEnvio.nombre}! Tu Alfajor personalizado por $${calcularPrecio} ha sido confirmado. Pronto será enviado a ${datosEnvio.direccion}.`);
+            };
+
+            const isSelectionComplete = ingrediente && chocolate && decoracion;
+
+            const renderOptions = (options, currentSelection, setter) => (
+                <div className="options-group">
+                    {options.map((item, index) => (
+                        <button 
+                            key={index} 
+                            onClick={() => setter(item)}
+                            className={item.name === (currentSelection && currentSelection.name) ? 'button-active' : ''}
+                        >
+                            {`${item.name} (+ $${item.price.toFixed(2)})`}
+                        </button>
+                    ))}
+                </div>
+            );
+
+
+            return (
+                <div className="container">
+                    {!pedidoListo ? (
+                        <>
+                            <h1>Arma tu Alfajor Personalizado 🎨</h1>
+                            
+                            <div className="alfajor-display">
+                                <img
+                                    className="alfajor"
+                                    src={getAlfajorImage}
+                                    alt="Vista previa del alfajor"
+                                />
+                            </div>
+
+                            {/* Sección de Selección */}
+                            <div>
+                                <h3>1. Relleno y Base:</h3>
+                                {renderOptions(INGREDIENTES, ingrediente, setIngrediente)}
+                            </div>
+
+                            <div>
+                                <h3>2. Baño de Chocolate:</h3>
+                                {renderOptions(CHOCOLATES, chocolate, setChocolate)}
+                            </div>
+
+                            <div>
+                                <h3>3. Decoración Final:</h3>
+                                {renderOptions(DECORACIONES, decoracion, setDecoracion)}
+                            </div>
+
+                            {/* Resumen de la selección en la vista 1 */}
+                            <div className="summary-box" style={{ marginTop: '30px' }}>
+                                <p style={{ fontWeight: 'bold', textAlign: 'center' }}>Resumen:</p>
+                                <p>Relleno: **{ingrediente ? ingrediente.name : 'Pendiente'}**</p>
+                                <p>Baño: **{chocolate ? chocolate.name : 'Pendiente'}**</p>
+                                <p>Deco: **{decoracion ? decoracion.name : 'Pendiente'}**</p>
+                            </div>
+
+                            <div style={{ marginTop: '15px' }}>
+                                <button
+                                    className="button"
+                                    onClick={() => isSelectionComplete ? setPedidoListo(true) : alert("¡Atención! Debes completar la selección de Relleno, Baño y Decoración.")}
+                                    style={{ opacity: isSelectionComplete ? 1 : 0.7 }}
+                                    disabled={!isSelectionComplete}
+                                >
+                                    ¡Listo! Ir a Pagar ({`$${calcularPrecio}`})
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ textAlign: 'left' }}>
+                            <h2>Confirmar Pedido y Pago</h2>
+                            
+                            <div className="summary-box">
+                                <h3 style={{ border: 'none' }}>Detalle de tu Alfajor</h3>
+                                <p><strong>Precio Base:</strong> ${PRECIO_BASE.toFixed(2)}</p>
+                                <p><strong>Relleno ({ingrediente.name}):</strong> +${ingrediente.price.toFixed(2)}</p>
+                                <p><strong>Baño ({chocolate.name}):</strong> +${chocolate.price.toFixed(2)}</p>
+                                <p><strong>Decoración ({decoracion.name}):</strong> +${decoracion.price.toFixed(2)}</p>
+                                <h3 style={{ textAlign: 'center', color: '#8c737f' }}>TOTAL A PAGAR: ${calcularPrecio}</h3>
+                            </div>
+                            
+                            <h2 style={{ color: '#c4a4b4' }}>Datos de Envío y Pago</h2>
+                            
+                            <form onSubmit={handleEnvio}>
+                                <label>
+                                    Nombre Completo:
+                                    <input 
+                                        type="text" 
+                                        name="nombre" 
+                                        value={datosEnvio.nombre}
+                                        onChange={handleInputChange}
+                                        required 
+                                    />
+                                </label>
+                                <label>
+                                    Dirección de Envío:
+                                    <input 
+                                        type="text" 
+                                        name="direccion" 
+                                        value={datosEnvio.direccion}
+                                        onChange={handleInputChange}
+                                        required 
+                                    />
+                                </label>
+                                <label>
+                                    Número de Tarjeta de débito (Solo dígitos):
+                                    <input 
+                                        type="text" 
+                                        name="tarjeta" 
+                                        value={datosEnvio.tarjeta}
+                                        onChange={handleInputChange}
+                                        maxLength="16"
+                                        required 
+                                    />
+                                </label>
+                                
+                                <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                                    <button type="submit" className="button">
+                                        Confirmar Pedido y Pagar
+                                    </button>
+                                </div>
+                            </form>
+                            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                                <button onClick={() => setPedidoListo(false)} className="options-group button" style={{ backgroundColor: '#a78a97' }}>
+                                    ← Volver a Modificar Alfajor
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+</body>
+</html>
